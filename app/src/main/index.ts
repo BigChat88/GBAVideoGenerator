@@ -1,32 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain } from "electron";
-import { spawn } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { convertToGba, loadPlayerAssets } from "./convert";
 import { probeVideo } from "./encoder/ffmpeg";
-import { findMgba, resolveFfmpeg } from "./tools-path";
+import { resolveFfmpeg } from "./tools-path";
 import { ConvertOptions, ProgressEvent } from "./types";
 
 function getResourcesRoot(): string {
   return app.isPackaged ? join(process.resourcesPath, "resources") : join(__dirname, "..", "..", "resources");
-}
-
-// Small per-user settings file (currently just the chosen mGBA path)
-interface Settings {
-  mgbaPath?: string;
-}
-const settingsPath = () => join(app.getPath("userData"), "settings.json");
-
-async function loadSettings(): Promise<Settings> {
-  try {
-    return JSON.parse(await readFile(settingsPath(), "utf8"));
-  } catch {
-    return {};
-  }
-}
-
-async function saveSettings(settings: Settings): Promise<void> {
-  await writeFile(settingsPath(), JSON.stringify(settings, null, 2));
 }
 
 let mainWindow: BrowserWindow | null = null;
@@ -57,16 +37,16 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
-ipcMain.handle("dialog:selectInputs", async () => {
+ipcMain.handle("dialog:selectInput", async () => {
   const result = await dialog.showOpenDialog(mainWindow!, {
-    title: "Add videos",
-    properties: ["openFile", "multiSelections"],
+    title: "Pick a video",
+    properties: ["openFile"],
     filters: [
       { name: "Video", extensions: ["mp4", "mov", "mkv", "avi", "webm", "wmv", "flv", "mpg", "mpeg", "m4v", "3gp"] },
       { name: "All files", extensions: ["*"] },
     ],
   });
-  return result.canceled ? [] : result.filePaths;
+  return result.canceled ? null : result.filePaths[0];
 });
 
 ipcMain.handle("dialog:selectOutput", async (_evt, suggestedName: string) => {
@@ -78,7 +58,7 @@ ipcMain.handle("dialog:selectOutput", async (_evt, suggestedName: string) => {
   return result.canceled ? null : result.filePath ?? null;
 });
 
-// Duration/audio info for the renderer's video list and size estimate
+// Duration/audio info for the renderer's size estimate
 ipcMain.handle("video:probe", async (_evt, inputPath: string) => {
   return probeVideo(resolveFfmpeg(getResourcesRoot()), inputPath);
 });
@@ -98,23 +78,4 @@ ipcMain.handle("convert:start", async (evt, options: ConvertOptions) => {
   } catch (err) {
     emit({ kind: "error", message: err instanceof Error ? err.message : String(err) });
   }
-});
-
-ipcMain.handle("mgba:open", async (_evt, romPath: string) => {
-  const settings = await loadSettings();
-  let exe = findMgba(settings.mgbaPath);
-  if (!exe) {
-    const result = await dialog.showOpenDialog(mainWindow!, {
-      title: "Locate mGBA",
-      properties: ["openFile"],
-      filters: process.platform === "win32" ? [{ name: "mGBA", extensions: ["exe"] }] : [],
-    });
-    if (result.canceled || !result.filePaths[0]) return false;
-    exe = result.filePaths[0];
-    await saveSettings({ ...settings, mgbaPath: exe });
-  }
-  const child = spawn(exe, [romPath], { detached: true, stdio: "ignore" });
-  child.on("error", () => undefined);
-  child.unref();
-  return true;
 });

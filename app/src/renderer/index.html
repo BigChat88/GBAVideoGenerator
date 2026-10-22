@@ -11,18 +11,18 @@
   <h1>GBA Video Generator</h1>
 
   <section class="field">
-    <div class="row spread">
-      <label>Videos</label>
-      <button id="btnAddVideos">Add videos...</button>
+    <label>Input video</label>
+    <div class="row">
+      <input type="text" id="inputPath" readonly placeholder="Pick a video file..." />
+      <button id="btnPickInput">Choose...</button>
     </div>
-    <ul class="videolist" id="videoList"></ul>
-    <small id="videoListHint">Add one video, or several to get a list menu on the GBA (played in this order).</small>
+    <small id="videoInfo"></small>
   </section>
 
   <section class="field">
     <label>ROM title</label>
     <input type="text" id="romTitle" value="My Video" maxlength="12" />
-    <small>Up to 12 characters (uppercase ASCII); shown as the menu title when there are several videos.</small>
+    <small>Up to 12 characters (uppercase ASCII), stored in the cartridge header.</small>
   </section>
 
   <section class="field">
@@ -74,9 +74,9 @@
     <small class="field-note">Typically 25&ndash;55% smaller video; the GBA may drop frames above ~20 fps at the largest resolutions.</small>
 
     <section class="field row">
-      <label><input type="checkbox" id="allowLarge" /> Allow ROMs over 32 MB, up to 64 MB (mGBA only)</label>
+      <label><input type="checkbox" id="allowLarge" /> Allow large ROMs, over 32 MB (up to 64 MB)</label>
     </section>
-    <small class="field-note">Bigger ROMs use the GBA Video cartridge mapper, which only mGBA emulates: they will not run on flashcarts or other emulators.</small>
+    <small class="field-note">Large ROMs use the GBA Video cartridge mapper and are not compatible with all devices: they won't run on flashcarts or most emulators (mGBA plays them).</small>
 
     <section class="field">
       <label>Dithering</label>
@@ -108,7 +108,6 @@
       </details>
 
       <div class="modal-actions">
-        <button id="btnMgba" hidden>Test in mGBA</button>
         <button id="btnCloseModal" disabled>Close</button>
       </div>
     </div>

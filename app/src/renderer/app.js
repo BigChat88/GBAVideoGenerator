@@ -7,14 +7,12 @@ const FPS_STEPS = [6, 5, 4, 3, 2, 1]; // VBlanks per frame: 10, 12, 15, 20, 30, 
 const MB = 1024 * 1024;
 const MAX_ROM_SIZE = 32 * MB;
 const MAX_LARGE_ROM_SIZE = 64 * MB;
-const MAX_VIDEOS = 256;
 // Typical LZ77 ratio on 8bpp frames, only used for the estimate
 const LZ77_RATIO = 0.75;
 
-// { path, name, duration|null, hasAudio, error|null }
-let videos = [];
+let inputPath = null;
+let probe = null; // { duration, hasVideo, hasAudio }
 let playerSizes = { player: 12 * 1024, large: 0x42000 };
-let lastOutputPath = null;
 
 window.api.playerSizes().then((s) => {
   playerSizes = s;
@@ -50,107 +48,29 @@ function formatDuration(sec) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
-// --- video list ---
-
-function renderVideoList() {
-  const list = $("videoList");
-  list.textContent = "";
-  videos.forEach((v, i) => {
-    const li = document.createElement("li");
-
-    const index = document.createElement("span");
-    index.className = "index";
-    index.textContent = String(i + 1);
-
-    const name = document.createElement("input");
-    name.type = "text";
-    name.maxLength = 31;
-    name.value = v.name;
-    name.title = v.path;
-    name.addEventListener("input", () => {
-      v.name = name.value;
-    });
-    name.addEventListener("change", () => {
-      v.name = asciiName(name.value, 31) || "video";
-      name.value = v.name;
-    });
-
-    const info = document.createElement("span");
-    info.className = "info";
-    if (v.error) {
-      info.textContent = "unreadable";
-      info.classList.add("warn");
-      info.title = v.error;
-    } else if (v.duration == null) {
-      info.textContent = "...";
-    } else {
-      info.textContent = formatDuration(v.duration) + (v.hasAudio ? "" : " (silent)");
-    }
-
-    const buttons = document.createElement("span");
-    buttons.className = "buttons";
-    const mk = (label, title, disabled, onClick) => {
-      const b = document.createElement("button");
-      b.textContent = label;
-      b.title = title;
-      b.disabled = disabled;
-      b.addEventListener("click", onClick);
-      buttons.appendChild(b);
-    };
-    mk("↑", "Move up", i === 0, () => moveVideo(i, -1));
-    mk("↓", "Move down", i === videos.length - 1, () => moveVideo(i, 1));
-    mk("✕", "Remove", false, () => {
-      videos.splice(i, 1);
-      renderVideoList();
-    });
-
-    li.append(index, name, info, buttons);
-    list.appendChild(li);
-  });
-
-  $("videoListHint").textContent =
-    videos.length > 1
-      ? `${videos.length} videos: the GBA shows a list menu (L/R switch videos, B back to the list).`
-      : "Add one video, or several to get a list menu on the GBA (played in this order).";
+$("btnPickInput").addEventListener("click", async () => {
+  const path = await window.api.selectInputFile();
+  if (!path) return;
+  inputPath = path;
+  probe = null;
+  $("inputPath").value = path;
+  const title = asciiName(baseNameWithoutExt(path), 12);
+  if (title) $("romTitle").value = title;
+  $("videoInfo").textContent = "Reading the video...";
+  $("videoInfo").classList.remove("warn");
   updateEstimate();
-}
-
-function moveVideo(i, delta) {
-  const j = i + delta;
-  if (j < 0 || j >= videos.length) return;
-  [videos[i], videos[j]] = [videos[j], videos[i]];
-  renderVideoList();
-}
-
-$("btnAddVideos").addEventListener("click", async () => {
-  const paths = await window.api.selectInputFiles();
-  if (!paths.length) return;
-  const room = MAX_VIDEOS - videos.length;
-  if (paths.length > room) alert(`A ROM holds at most ${MAX_VIDEOS} videos; only the first ${room} were added.`);
-  const added = paths.slice(0, room).map((path) => ({
-    path,
-    name: asciiName(baseNameWithoutExt(path), 31) || "video",
-    duration: null,
-    hasAudio: true,
-    error: null,
-  }));
-  if (videos.length === 0 && added.length) {
-    $("romTitle").value = asciiName(added.length === 1 ? added[0].name : "Videos", 12);
+  try {
+    probe = await window.api.probeVideo(path);
+    $("videoInfo").textContent = probe.hasVideo
+      ? `${formatDuration(probe.duration)}${probe.hasAudio ? "" : " — no audio track (the ROM will be silent)"}`
+      : "This file has no video stream.";
+    $("videoInfo").classList.toggle("warn", !probe.hasVideo);
+  } catch (err) {
+    probe = null;
+    $("videoInfo").textContent = `Could not read the video: ${err.message || err}`;
+    $("videoInfo").classList.add("warn");
   }
-  videos.push(...added);
-  renderVideoList();
-
-  for (const v of added) {
-    try {
-      const info = await window.api.probeVideo(v.path);
-      v.duration = info.duration;
-      v.hasAudio = info.hasAudio;
-      if (!info.hasVideo) v.error = "This file has no video stream.";
-    } catch (err) {
-      v.error = String(err.message || err);
-    }
-    renderVideoList();
-  }
+  updateEstimate();
 });
 
 // --- size estimate ---
@@ -163,11 +83,10 @@ function updateSliders() {
 }
 
 function updateEstimate() {
-  const known = videos.filter((v) => v.duration != null && !v.error);
-  if (!known.length) {
+  if (!probe || !probe.hasVideo) {
     $("sizeValue").textContent = "—";
     $("sizeFill").style.width = "0%";
-    $("sizeBar").classList.remove("over");
+    $("sizeBar").classList.remove("over", "large");
     $("sizeNote").textContent = "A GBA cartridge holds at most 32 MB.";
     $("sizeNote").classList.remove("warn");
     return;
@@ -183,16 +102,14 @@ function updateEstimate() {
   // The audio track is always stored (silence when audio is off)
   const audioBytes = vpf * ($("audioCodec").value === "adpcm" ? 4 + spv / 2 : spv);
   const bytesPerSec = (frameBytes + audioBytes) * fps;
-  const seconds = known.reduce((n, v) => n + v.duration, 0);
-  const base = playerSizes.player + 16 + 64 * videos.length;
-  let total = base + seconds * bytesPerSec;
+  const base = playerSizes.player + 16 + 64;
+  let total = base + probe.duration * bytesPerSec;
   const large = allowLarge && total > MAX_ROM_SIZE;
   if (large) total += playerSizes.large - playerSizes.player;
 
   const limit = allowLarge ? MAX_LARGE_ROM_SIZE : MAX_ROM_SIZE;
   const over = total > limit;
-  $("sizeValue").textContent =
-    `~${formatMB(total)} for ${formatDuration(seconds)}` + (compress ? " (rough, depends on the content)" : "");
+  $("sizeValue").textContent = `~${formatMB(total)}` + (compress ? " (rough, depends on the content)" : "");
   $("sizeFill").style.width = `${Math.min(100, (total / limit) * 100)}%`;
   $("sizeBar").classList.toggle("over", over);
   $("sizeBar").classList.toggle("large", large && !over);
@@ -204,11 +121,13 @@ function updateEstimate() {
       `about ${formatDuration(fits)} of video fits: lower the resolution or frame rate, enable compression or ` +
       `ADPCM${allowLarge ? "" : ", or allow large ROMs"}.`;
   } else if (large) {
-    $("sizeNote").textContent = "Over 32 MB: this will be a large ROM that plays in mGBA only.";
+    $("sizeNote").textContent =
+      "Over 32 MB: this will be a large ROM, which is not compatible with all devices " +
+      "(it won't run on flashcarts or most emulators).";
   } else {
-    $("sizeNote").textContent = `A GBA cartridge holds at most 32 MB${allowLarge ? " (64 MB for mGBA-only large ROMs)" : ""}.`;
+    $("sizeNote").textContent = "A GBA cartridge holds at most 32 MB.";
   }
-  $("sizeNote").classList.toggle("warn", over);
+  $("sizeNote").classList.toggle("warn", over || large);
 }
 
 $("resolution").addEventListener("input", updateSliders);
@@ -222,16 +141,16 @@ $("audioEnabled").addEventListener("change", () => {
   $("audioCodec").disabled = !on;
 });
 updateSliders();
-renderVideoList();
 
 // --- conversion ---
 
 function collectOptions(outputPath) {
   const [width, height] = currentResolution();
+  const romTitle = $("romTitle").value || "My Video";
   return {
-    videos: videos.map((v) => ({ path: v.path, name: asciiName(v.name, 31) || "video" })),
+    videos: [{ path: inputPath, name: asciiName(baseNameWithoutExt(inputPath), 31) || "video" }],
     outputPath,
-    romTitle: $("romTitle").value || "My Video",
+    romTitle,
     width,
     height,
     vblanksPerFrame: currentVpf(),
@@ -273,7 +192,6 @@ function openConvertModal() {
   $("progressFill").style.width = "0%";
   $("progressPct").textContent = "0%";
   $("btnCloseModal").disabled = true;
-  $("btnMgba").hidden = true;
   $("convertModal").hidden = false;
 }
 
@@ -285,10 +203,6 @@ function finishConvertModal() {
 
 $("btnCloseModal").addEventListener("click", () => {
   $("convertModal").hidden = true;
-});
-
-$("btnMgba").addEventListener("click", async () => {
-  if (lastOutputPath) await window.api.openInMgba(lastOutputPath);
 });
 
 window.api.onProgress((event) => {
@@ -307,23 +221,21 @@ window.api.onProgress((event) => {
     $("progressBar").classList.add("error");
     finishConvertModal();
   } else if (event.kind === "success") {
-    lastOutputPath = event.outputPath;
     $("stageLabel").textContent =
-      `Done (${formatMB(event.romSize)}${event.large ? ", large ROM: mGBA only" : ""}) — saved to ${event.outputPath}`;
+      `Done (${formatMB(event.romSize)}${event.large ? ", large ROM: not compatible with all devices" : ""}) ` +
+      `— saved to ${event.outputPath}`;
     setProgress(100);
-    $("btnMgba").hidden = false;
     finishConvertModal();
   }
 });
 
 $("btnConvert").addEventListener("click", async () => {
-  if (!videos.length) {
-    alert("Add at least one video first.");
+  if (!inputPath) {
+    alert("Pick an input video first.");
     return;
   }
-  const bad = videos.find((v) => v.error);
-  if (bad) {
-    alert(`"${bad.name}" can't be used: ${bad.error}\nRemove it from the list first.`);
+  if (probe && !probe.hasVideo) {
+    alert("The selected file has no video stream.");
     return;
   }
   const suggested = ($("romTitle").value || "video").replace(/[^a-z0-9_-]+/gi, "_") + ".gba";

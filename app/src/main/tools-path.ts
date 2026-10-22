@@ -36,19 +36,3 @@ export function resolveFfmpeg(resourcesRoot: string): string {
   }
   return "ffmpeg";
 }
-
-const MGBA_CANDIDATES =
-  process.platform === "win32"
-    ? ["C:\\Program Files\\mGBA\\mGBA.exe", "C:\\Program Files (x86)\\mGBA\\mGBA.exe"]
-    : process.platform === "darwin"
-      ? ["/Applications/mGBA.app/Contents/MacOS/mGBA"]
-      : ["/usr/bin/mgba-qt", "/usr/local/bin/mgba-qt"];
-
-/** mGBA from the user's saved choice, PATH or a default install location. */
-export function findMgba(saved: string | undefined): string | null {
-  if (saved && existsSync(saved)) return saved;
-  for (const cmd of ["mGBA", "mgba-qt", "mgba"]) {
-    if (commandExists(cmd)) return cmd;
-  }
-  return MGBA_CANDIDATES.find((p) => existsSync(p)) ?? null;
-}

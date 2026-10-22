@@ -55,12 +55,12 @@ function audioBytesPerFrame(options: ConvertOptions): number {
 }
 
 function tooBigError(options: ConvertOptions, video: VideoInput, fitsSeconds: number, multiple: boolean): Error {
-  const limit = options.allowLarge ? "64 MB a large (mGBA-only) ROM" : "32 MB a GBA cartridge";
+  const limit = options.allowLarge ? "64 MB a large ROM" : "32 MB a GBA cartridge";
   const suggestions = [
     "lower the resolution or frame rate",
     options.compress ? null : "enable compression",
     options.audioCodec === "adpcm" ? null : "use ADPCM audio",
-    options.allowLarge ? null : "allow large ROMs (mGBA only)",
+    options.allowLarge ? null : "allow large ROMs (not compatible with all devices)",
     multiple ? "remove videos" : "use a shorter video",
   ].filter(Boolean);
   return new Error(
@@ -246,7 +246,7 @@ export async function convertToGba(options: ConvertOptions, resourcesRoot: strin
     // The running estimate already stops long before this; just in case
     throw new Error(`The ROM came out at ${(rom.length / MB).toFixed(1)} MB, over the limit.`);
   }
-  if (large) log("Over 32 MB: built as a large Matrix-mapped ROM (plays in mGBA only).");
+  if (large) log("Over 32 MB: built as a large ROM, not compatible with all devices (no flashcarts; mGBA plays it).");
 
   await mkdir(dirname(options.outputPath), { recursive: true });
   const tmp = `${options.outputPath}.tmp`;

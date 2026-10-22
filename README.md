@@ -2,31 +2,31 @@
 
 ## What it does
 
-Turns ordinary video files into a **playable Game Boy Advance ROM** that
-plays them back with sound on a GBA flashcart or in any GBA emulator (tested
+Turns an ordinary video file into a **playable Game Boy Advance ROM** that
+plays it back with sound on a GBA flashcart or in any GBA emulator (tested
 in mGBA).
 
 A small, generic player program ([core/](core/)) is compiled once for the
-GBA; each conversion only re-encodes your videos into the GBA's native
-formats and appends them to a copy of that player.
+GBA; each conversion only re-encodes your video into the GBA's native
+formats and appends it to a copy of that player.
 
 ## What it generates
 
 A single **`.gba` ROM file** at the location you choose. It embeds the
-videos, their audio and the player, and needs nothing else to run.
+video, its audio and the player, and needs nothing else to run; the video
+starts playing as soon as the ROM boots.
 
-- **One or more videos:** a single video starts playing right away; with
-  several, the ROM opens on a list menu and plays them in order.
 - **Video:** 96×64 up to 240×160 (hardware-upscaled to the full 240×160
   screen), 10 to 60 fps. Every frame gets its own 252-color palette;
   optional dithering and experimental LZ77 compression.
-- **Audio:** mono, 9.1 to 36.3 kHz, as 8-bit PCM or IMA ADPCM (about half
-  the size), locked to the GBA's 59.73 Hz refresh so audio and video never
+- **Audio:** mono, 9.1 to 36.3 kHz, as IMA ADPCM (default) or 8-bit PCM
+  (twice the size), locked to the GBA's 59.73 Hz refresh so audio and video never
   drift.
 - **Size:** up to **32 MB**, the most a GBA cartridge can address. Optionally
-  up to **64 MB** as a "large ROM" using the GBA Video cartridge mapper —
-  those only play in **mGBA** (not on flashcarts or other emulators). The app
-  shows a size estimate before converting.
+  up to **64 MB** as a **large ROM** using the GBA Video cartridge mapper —
+  large ROMs are **not compatible with all devices**: they don't run on
+  flashcarts or most emulators (mGBA plays them). The app shows a size
+  estimate before converting.
 
 ### Controls on the GBA
 
@@ -34,14 +34,10 @@ videos, their audio and the player, and needs nothing else to run.
 |---|---|
 | START / A / SELECT | Pause / resume |
 | Left / Right | Seek −5 s / +5 s (hold to repeat) |
-| B | Restart the video (single video) / back to the list (several videos) |
-| L / R | Previous / next video (several videos) |
-| Up / Down, A | Pick a video in the list menu |
+| B | Back to the start |
 
-When a video ends it stays on its last frame with a **play icon**; press
-START or A to play it again. With several videos each one moves on to the
-next, and the icon appears after the last one (START/A replays the list,
-B returns to the menu).
+When the video ends it stays on its last frame with a **play icon**; press
+START or A to play it again.
 
 ## Desktop application
 
@@ -57,11 +53,9 @@ directly — **nothing to install** (ffmpeg is included):
   unzip and run the `.app`. It isn't code-signed, so the first launch needs
   *right-click → Open*.
 
-Then: **Add videos...** (reorder or rename them in the list) → set a ROM
-title → choose resolution and frame rate (watch the size estimate) →
-**Convert to .gba** → choose where to save it → optionally **Test in mGBA**
-(found on `PATH`, in the default install folder, or picked once and
-remembered).
+Then: pick an input video → set a ROM title → choose resolution and frame
+rate (watch the size estimate) → **Convert to .gba** → choose where to save
+the ROM.
 
 ### Development
 
