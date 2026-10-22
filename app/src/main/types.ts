@@ -35,7 +35,7 @@ export const DEFAULT_OPTIONS: Omit<ConvertOptions, "videos" | "outputPath" | "ro
   compress: false,
   audioMode: "source",
   audioSpv: 304,
-  audioCodec: "pcm",
+  audioCodec: "adpcm",
   allowLarge: false,
 };
 

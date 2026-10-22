@@ -23,7 +23,7 @@ export async function probeVideo(ffmpeg: string, inputPath: string): Promise<Pro
 
   if (!/^Input #0/m.test(stderr)) {
     const reason = stderr.trim().split(/\r?\n/).pop() ?? "";
-    throw new Error(`ffmpeg could not read the file${reason ? `: ${reason}` : ""}`);
+    throw new Error(`ffmpeg could not read "${inputPath}"${reason ? `: ${reason}` : ""}`);
   }
   const d = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(stderr);
   // Cover art in audio files shows up as an "(attached pic)" video stream

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { copyFile, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { adpcmBlockBytes, adpcmEncode } from "./encoder/adpcm";
@@ -203,6 +204,12 @@ export async function convertToGba(options: ConvertOptions, resourcesRoot: strin
   emit({ kind: "stage", stage: "probe", label: "Reading the videos..." });
   const infos: ProbeResult[] = [];
   for (const video of options.videos) {
+    if (!existsSync(video.path)) {
+      throw new Error(
+        `"${video.name}" is no longer at ${video.path} (moved, renamed or deleted after adding it?). ` +
+          `Remove it from the list and add it again.`
+      );
+    }
     const info = await probeVideo(ffmpeg, video.path);
     if (!info.hasVideo) throw new Error(`"${video.name}" has no video stream.`);
     infos.push(info);
