@@ -96,6 +96,13 @@ app/assets/           app icon (icon-original.png is the unedited source)
 
 ## Credits / license
 
+The GBA player is a **modified version** of
+[GBA Video Maker](https://github.com/Falko-toolis/gba-video-maker) by
+**Bytecodes Software** — reduced to video playback, with an end-of-video
+play prompt and large-ROM support. It is not the original and not an
+official Bytecodes Software release; see
+[core/LICENSE-GbaVideo](core/LICENSE-GbaVideo).
+
 The bundled ffmpeg is an unmodified LGPL build of [FFmpeg](https://ffmpeg.org)
 (Windows/Linux from [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds),
 macOS built by `app/scripts/build-ffmpeg-macos.sh`); its license and source
