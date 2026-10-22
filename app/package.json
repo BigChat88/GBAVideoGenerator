@@ -1,6 +1,6 @@
 {
   "name": "gba-video-generator-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Turns videos (mp4, etc.) into a playable Game Boy Advance .gba ROM, with a cross-platform desktop interface. ffmpeg is bundled.",
   "private": true,
   "author": "BigChat88",
