@@ -1,0 +1,5 @@
+core/build/
+core/*.elf
+core/*.gba
+.dide/
+app/resources/tools/

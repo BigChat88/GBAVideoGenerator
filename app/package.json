@@ -1,0 +1,72 @@
+{
+  "name": "gba-video-generator-desktop",
+  "version": "0.2.0",
+  "description": "Turns videos (mp4, etc.) into a playable Game Boy Advance .gba ROM, with a cross-platform desktop interface. ffmpeg is bundled.",
+  "private": true,
+  "author": "BigChat88",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-static.mjs",
+    "start": "npm run build && electron .",
+    "dev": "npm run build && electron . --dev",
+    "smoke-test": "npm run build && node scripts/smoke-test.mjs",
+    "fetch-ffmpeg": "node scripts/fetch-ffmpeg.mjs",
+    "dist": "npm run build && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "typescript": "^7.0.2"
+  },
+  "build": {
+    "appId": "com.gbavideogenerator.desktop",
+    "productName": "GBA Video Generator",
+    "icon": "assets/icon.png",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "unpackDirName": false,
+      "artifactName": "GBAVideoGenerator-${version}-portable.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "AudioVideo",
+      "artifactName": "GBAVideoGenerator-${version}-linux-${arch}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.video",
+      "identity": null,
+      "artifactName": "GBAVideoGenerator-${version}-mac-${arch}.${ext}"
+    },
+    "publish": null
+  },
+  "allowScripts": {
+    "electron@33.4.11": true
+  }
+}

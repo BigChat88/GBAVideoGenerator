@@ -1,0 +1,149 @@
+name: Release Desktop App
+
+# On every push to main: check that the GBA player still compiles, run the
+# conversion smoke test, then build the Electron app in app/ for Windows,
+# Linux and macOS (Apple Silicon) with ffmpeg bundled inside, and publish a
+# single GitHub Release with all builds attached. End users only download
+# and run the build for their OS: nothing else to install.
+#
+# The prebuilt GBA player is committed under app/resources/rom-assets/;
+# ffmpeg is fetched (Windows/Linux, LGPL builds) or compiled (macOS) here.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+# Allow the workflow to create tags and releases.
+permissions:
+  contents: write
+
+# Never run two releases at once; let an in-flight one finish.
+concurrency:
+  group: release-desktop-app
+  cancel-in-progress: false
+
+jobs:
+  player:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the GBA player (normal, large and loader)
+        working-directory: core
+        run: make
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Fetch ffmpeg
+        run: npm run fetch-ffmpeg
+      - name: Smoke test
+        run: npm run smoke-test
+
+  build:
+    needs: [player, smoke-test]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            artifact-glob: app/release/*.exe
+          - os: ubuntu-latest
+            platform: linux
+            artifact-glob: app/release/*.AppImage
+          - os: macos-15
+            platform: mac
+            artifact-glob: app/release/*.zip
+
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch ffmpeg (Windows / Linux)
+        if: matrix.platform != 'mac'
+        run: npm run fetch-ffmpeg
+
+      - name: Cache ffmpeg (macOS)
+        if: matrix.platform == 'mac'
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: app/resources/tools/darwin-arm64
+          key: ffmpeg-darwin-arm64-${{ hashFiles('app/scripts/build-ffmpeg-macos.sh') }}
+
+      - name: Build ffmpeg (macOS)
+        if: matrix.platform == 'mac' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        run: |
+          brew install meson ninja nasm pkg-config
+          sh scripts/build-ffmpeg-macos.sh
+
+      - name: Build app (electron-builder)
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No Apple Developer certificate available: skip code signing
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: List build output
+        shell: bash
+        run: ls -la release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: ${{ matrix.artifact-glob }}
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read app version
+        id: ver
+        run: echo "version=$(node -p "require('./app/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist-artifacts
+          merge-multiple: true
+
+      - name: List downloaded artifacts
+        run: ls -la dist-artifacts
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.version }}-build.${{ github.run_number }}
+          name: GBA Video Generator v${{ steps.ver.outputs.version }} (build ${{ github.run_number }})
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          files: dist-artifacts/*

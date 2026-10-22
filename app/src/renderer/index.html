@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'" />
+  <title>GBA Video Generator</title>
+  <link rel="icon" href="icon.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <h1>GBA Video Generator</h1>
+
+  <section class="field">
+    <div class="row spread">
+      <label>Videos</label>
+      <button id="btnAddVideos">Add videos...</button>
+    </div>
+    <ul class="videolist" id="videoList"></ul>
+    <small id="videoListHint">Add one video, or several to get a list menu on the GBA (played in this order).</small>
+  </section>
+
+  <section class="field">
+    <label>ROM title</label>
+    <input type="text" id="romTitle" value="My Video" maxlength="12" />
+    <small>Up to 12 characters (uppercase ASCII); shown as the menu title when there are several videos.</small>
+  </section>
+
+  <section class="field">
+    <label>Resolution: <output id="resolutionValue">120&times;80</output> (upscaled to 240&times;160)</label>
+    <input type="range" id="resolution" min="0" max="6" value="1" />
+  </section>
+
+  <section class="field">
+    <label>Frame rate: <output id="fpsValue">12 fps</output></label>
+    <input type="range" id="fps" min="0" max="5" value="1" />
+  </section>
+
+  <section class="field">
+    <label>Estimated ROM size: <output id="sizeValue">&mdash;</output></label>
+    <div class="sizebar" id="sizeBar"><div class="sizebar-fill" id="sizeFill"></div></div>
+    <small id="sizeNote">A GBA cartridge holds at most 32 MB.</small>
+  </section>
+
+  <details class="advanced">
+    <summary>Advanced options</summary>
+
+    <section class="field row">
+      <label><input type="checkbox" id="audioEnabled" checked /> Include audio (uncheck for a silent ROM)</label>
+    </section>
+
+    <section class="field">
+      <label>Audio sample rate</label>
+      <select id="audioSpv">
+        <option value="152">9.1 kHz (smallest)</option>
+        <option value="228">13.6 kHz</option>
+        <option value="304" selected>18.2 kHz (default)</option>
+        <option value="456">27.2 kHz</option>
+        <option value="608">36.3 kHz (best)</option>
+      </select>
+    </section>
+
+    <section class="field">
+      <label>Audio format</label>
+      <select id="audioCodec">
+        <option value="pcm" selected>8-bit PCM (best quality)</option>
+        <option value="adpcm">IMA ADPCM (about half the size)</option>
+      </select>
+      <small>Mono; ADPCM is decoded by the GBA as it plays and sounds slightly grainier.</small>
+    </section>
+
+    <section class="field row">
+      <label><input type="checkbox" id="compress" /> LZ77 frame compression (experimental)</label>
+    </section>
+    <small class="field-note">Typically 25&ndash;55% smaller video; the GBA may drop frames above ~20 fps at the largest resolutions.</small>
+
+    <section class="field row">
+      <label><input type="checkbox" id="allowLarge" /> Allow ROMs over 32 MB, up to 64 MB (mGBA only)</label>
+    </section>
+    <small class="field-note">Bigger ROMs use the GBA Video cartridge mapper, which only mGBA emulates: they will not run on flashcarts or other emulators.</small>
+
+    <section class="field">
+      <label>Dithering</label>
+      <select id="dither">
+        <option value="none" selected>None (cleanest, compresses best)</option>
+        <option value="bayer">Ordered (Bayer)</option>
+        <option value="sierra2_4a">Sierra Lite</option>
+        <option value="floyd_steinberg">Floyd&ndash;Steinberg</option>
+      </select>
+      <small>Each frame gets its own 252-color palette; dithering smooths gradients but adds noise.</small>
+    </section>
+  </details>
+
+  <button id="btnConvert" class="primary">Convert to .gba</button>
+
+  <div class="modal-backdrop" id="convertModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h2 id="modalTitle">Generating your ROM</h2>
+      <div class="stage" id="stageLabel">Starting...</div>
+
+      <div class="progressbar" id="progressBar">
+        <div class="progressbar-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-pct" id="progressPct">0%</div>
+
+      <details class="log-details">
+        <summary>Show details</summary>
+        <pre id="log"></pre>
+      </details>
+
+      <div class="modal-actions">
+        <button id="btnMgba" hidden>Test in mGBA</button>
+        <button id="btnCloseModal" disabled>Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
